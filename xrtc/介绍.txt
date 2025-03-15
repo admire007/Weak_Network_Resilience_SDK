@@ -1,0 +1,5 @@
+xrtc此文件夹输出一个lib库和一个头文件
+device : 包含各种音视频源
+media/chain/xrtc_preview : 预览
+media/sink:  视频的渲染
+media/base/base_pin.h:回旋针  将两个合适的MediaObject* obj_ 连接到一起
