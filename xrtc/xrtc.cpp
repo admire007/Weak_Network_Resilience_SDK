@@ -7,7 +7,12 @@
 
 namespace xrtc {
 	void xrtc::XRTCEngine::Init()
+		
 	{
+		rtc::LogMessage::LogTimestamps(true);//显示程序启动时间
+		rtc::LogMessage::LogThreads(true);
+		rtc::LogMessage::LogToDebug(rtc::LS_VERBOSE);
+		
 		RTC_LOG(LS_INFO) << "XTRCSDK init";
 	}
 	uint32_t XRTCEngine::GetGameraCount()

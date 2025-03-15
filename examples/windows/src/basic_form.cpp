@@ -106,6 +106,7 @@ void BasicForm::InitComboCam() {
 		combo_cam_->SelectItem(0);
 	}
 
+	//进行更换摄像头时触发事件绑定
 	combo_cam_->AttachSelect(nbase::Bind(&BasicForm::OnComboCamItemSelected, this,
 		std::placeholders::_1));
 }
