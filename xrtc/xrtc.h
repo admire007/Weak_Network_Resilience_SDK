@@ -51,6 +51,28 @@ namespace xrtc
 		kAudioInitRecordingErr,
 		kAudioStartRecordingErr,
 	};
+	
+	//消耗帧
+	class IXRTCConsumer {
+	public:
+		virtual ~IXRTCConsumer() {}
+		virtual void OnFrame(std::shared_ptr<MediaFrame> frame) = 0;
+	};
+
+	//视频源
+	class IVideoSource {
+	public:
+		virtual ~IVideoSource() {}
+		virtual void Start() = 0;
+		virtual void Setup(const std::string& json_config) = 0;//设置摄像头采集参数
+		virtual void Stop() = 0;
+		virtual void Destroy() = 0;
+
+		virtual void AddConsumer(IXRTCConsumer* consumer) = 0;
+		virtual void RemoveConsumer(IXRTCConsumer* consumer) = 0;
+
+
+	};
 
 
 
@@ -63,7 +85,7 @@ namespace xrtc
 		static uint32_t GetGameraCount();
 		static int32_t GetCameraInfo(int index, std::string& device_name,
 			std::string& device_id);
-		/*static IVideoSource* CreateCamSource(const std::string& cam_id);*/
+		static IVideoSource* CreateCamSource(const std::string& cam_id);
 		
 		// 音频设备
 		//static int16_t GetMicCount();

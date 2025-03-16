@@ -3,6 +3,7 @@
 #include <rtc_base/logging.h>
 #include <rtc_base/task_utils/to_queued_task.h>
 #include "xrtc/base/xrtc_global.h"
+#include "xrtc/device/cam_impl.h"
 
 
 namespace xrtc {
@@ -33,6 +34,13 @@ namespace xrtc {
 			device_id = id;
 			return res;
 			});
+	}
+
+	IVideoSource* XRTCEngine::CreateCamSource(const std::string& cam_id) {
+		return XRTCGlobal::Instance()->api_thread()->Invoke<IVideoSource*>(RTC_FROM_HERE, [=]() {
+			return new CamImpl(cam_id);
+			});
+
 	}
 	
 }

@@ -68,6 +68,9 @@ private:
 	ui::RichEdit* edit_uid_ = nullptr;
 	ui::RichEdit* edit_stream_name_ = nullptr;
 	ui::Label* label_network_tips_ = nullptr;
+
+	xrtc::IVideoSource* cam_source_ = nullptr;
+	std::atomic<bool> device_init_{false};
 	
 };
 

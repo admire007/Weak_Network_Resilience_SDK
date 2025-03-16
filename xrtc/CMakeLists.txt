@@ -5,6 +5,7 @@ project(xrtc)
 file(GLOB all_src
 "./*.cpp"
 "./base/*.cpp"
+"./device/*.cpp"
 
 )
 
@@ -28,7 +29,7 @@ if (CMAKE_SYSTEM_NAME MATCHES "Windows")
 	)
 endif()
 
-add_library(xrtc SHARED ${all_src} "xrtc.cpp" "xrtc.h")
+add_library(xrtc SHARED ${all_src} "xrtc.cpp" "xrtc.h" "device/cam_impl.cpp" "device/cam_impl.h" "device/xrtc_render.h")
 target_link_libraries(xrtc
     absl_bad_optional_access
     absl_throw_delegate
