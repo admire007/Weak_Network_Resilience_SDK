@@ -34,7 +34,7 @@ std::wstring BasicForm::GetWindowClassName() const
 void BasicForm::InitWindow()
 {
 	btn_device_start_ = dynamic_cast<ui::Button*>(FindControl(L"btn_device_start"));
-	xrtc::XRTCEngine::Init();
+	xrtc::XRTCEngine::Init(this);
 	
 	InitComboCam();
 
@@ -229,8 +229,22 @@ void BasicForm::ShowToast(const std::wstring& toast, bool err) {
 	});
 }
 
+//将一个任务发布到 UI 线程的消息循环中，确保任务在 UI 线程上执行。
 void BasicForm::CallOnUIThread(const std::function<void(void)>& task) {
 	ui_thread_->message_loop()->PostTask(task);
+}
+
+void BasicForm::OnVideoSourceSuccess(xrtc::IVideoSource* video_source)
+{
+	// api_thread线程回调
+	device_init_ = true;
+	ShowToast(L"摄像头启动成功", false);
+}
+
+void BasicForm::OnVideoSourceFailed(xrtc::IVideoSource* video_source, xrtc::XRTCError err)
+{
+	std::wstring wstr = nbase::StringPrintf(L"摄像头启动设备，err_code: %d", err);
+	ShowToast(wstr, true);
 }
 
 

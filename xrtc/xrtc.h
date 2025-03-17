@@ -74,13 +74,17 @@ namespace xrtc
 
 	};
 
-
+	class XRTC_API XRTCEngineObserver {
+	public:
+		virtual void OnVideoSourceSuccess(IVideoSource*) {}
+		virtual void OnVideoSourceFailed(IVideoSource*,XRTCError) {}
+	};
 
 
 
 	class XRTC_API XRTCEngine {
 	public:
-		static void Init();
+		static void Init(XRTCEngineObserver* observer);
 		//  ”∆µ…Ë±∏
 		static uint32_t GetGameraCount();
 		static int32_t GetCameraInfo(int index, std::string& device_name,

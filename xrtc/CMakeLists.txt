@@ -6,6 +6,7 @@ file(GLOB all_src
 "./*.cpp"
 "./base/*.cpp"
 "./device/*.cpp"
+"./media/base/*.cpp"
 
 )
 

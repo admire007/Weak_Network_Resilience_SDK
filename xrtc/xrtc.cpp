@@ -7,12 +7,14 @@
 
 
 namespace xrtc {
-	void xrtc::XRTCEngine::Init()
+	void xrtc::XRTCEngine::Init(XRTCEngineObserver* observer)
 		
 	{
 		rtc::LogMessage::LogTimestamps(true);//显示程序启动时间
 		rtc::LogMessage::LogThreads(true);
 		rtc::LogMessage::LogToDebug(rtc::LS_VERBOSE);
+
+		XRTCGlobal::Instance()->RegisterEngineObserver(observer);
 		
 		RTC_LOG(LS_INFO) << "XTRCSDK init";
 	}

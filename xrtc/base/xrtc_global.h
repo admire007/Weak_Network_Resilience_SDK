@@ -15,6 +15,12 @@ class XRTCGlobal {
 public:
     static XRTCGlobal* Instance();
 
+    XRTCEngineObserver* engine_observer() { return engine_observer_; }
+    void RegisterEngineObserver(XRTCEngineObserver* observer) {
+        engine_observer_ = observer;
+
+    }
+
 
     rtc::Thread* api_thread() { return api_thread_.get(); }
     rtc::Thread* worker_thread() { return worker_thread_.get(); }
@@ -33,7 +39,7 @@ private:
     std::unique_ptr<rtc::Thread> worker_thread_;
     std::unique_ptr<rtc::Thread> network_thread_;
     std::unique_ptr<webrtc::VideoCaptureModule::DeviceInfo> video_device_info_;
-  
+    XRTCEngineObserver* engine_observer_ = nullptr;
 };
 
 } // namespace xrtc

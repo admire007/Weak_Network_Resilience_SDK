@@ -6,6 +6,7 @@
 #include <modules/video_capture/video_capture_factory.h>
 
 #include "xrtc/base/xrtc_global.h"
+#include "xrtc/media/base/media_frame.h"
 
 namespace xrtc {
 
@@ -77,24 +78,21 @@ void CamImpl::Start() {
             has_start_ = true;
 
         } while (0);
-        
-        }));
+     
 
+        // 回调启动结果
+        if (err != XRTCError::kNoErr) {
+            if (XRTCGlobal::Instance()->engine_observer()) {
+                XRTCGlobal::Instance()->engine_observer()->OnVideoSourceFailed(this, err);
+            }
+        }
+        else {
+            if (XRTCGlobal::Instance()->engine_observer()) {
+                XRTCGlobal::Instance()->engine_observer()->OnVideoSourceSuccess(this);
+            }
+        }
 
-    //     TODO
-    //    // 回调启动结果
-    //    if (err != XRTCError::kNoErr) {
-    //        if (XRTCGlobal::Instance()->engine_observer()) {
-    //            XRTCGlobal::Instance()->engine_observer()->OnVideoSourceFailed(this, err);
-    //        }
-    //    }
-    //    else {
-    //        if (XRTCGlobal::Instance()->engine_observer()) {
-    //            XRTCGlobal::Instance()->engine_observer()->OnVideoSourceSuccess(this);
-    //        }
-    //    }
-
-    //}));
+    }));
 }
 
 void CamImpl::Stop() {
@@ -130,14 +128,14 @@ void CamImpl::Setup(const std::string& json_config)
 }
 
 void CamImpl::AddConsumer(IXRTCConsumer* consumer) {
-    /*current_thread_->PostTask(webrtc::ToQueuedTask([=] {
+    current_thread_->PostTask(webrtc::ToQueuedTask([=] {
         RTC_LOG(LS_INFO) << "CamImpl add consumer: " << consumer;
         consumer_list_.push_back(consumer);
-    }));*/
+    }));
 }
 
 void CamImpl::RemoveConsumer(IXRTCConsumer* consumer) {
-    /*current_thread_->PostTask(webrtc::ToQueuedTask([=] {
+    current_thread_->PostTask(webrtc::ToQueuedTask([=] {
         RTC_LOG(LS_INFO) << "CamImpl Remove consumer: " << consumer;
         auto iter = consumer_list_.begin();
         for (; iter != consumer_list_.end(); ++iter) {
@@ -146,7 +144,7 @@ void CamImpl::RemoveConsumer(IXRTCConsumer* consumer) {
                 break;
             }
         }
-    }));*/
+    }));
 }
 
 //对视频帧进行处理，包括帧率计算、数据拷贝、时间戳处理等操作，并将处理后的帧数据通过异步任务分发给消费者（consumer）
@@ -167,6 +165,46 @@ void CamImpl::OnFrame(const webrtc::VideoFrame& frame)
 
     }
 
+    int src_width = frame.width();
+    int src_height = frame.height();
+    int stridey = frame.video_frame_buffer()->GetI420()->StrideY();
+    int strideu = frame.video_frame_buffer()->GetI420()->StrideU();
+    int stridev = frame.video_frame_buffer()->GetI420()->StrideV();
+
+    // Y + U + V
+    int size = stridey * src_height + (strideu + stridev) * ((src_height + 1) / 2);
+    std::shared_ptr<MediaFrame> video_frame = std::make_shared<MediaFrame>(size);
+    video_frame->fmt.media_type = MainMediaType::kMainTypeVideo;
+    video_frame->fmt.sub_fmt.video_fmt.type = SubMediaType::kSubTypeI420;
+    video_frame->fmt.sub_fmt.video_fmt.width = src_width;
+    video_frame->fmt.sub_fmt.video_fmt.height = src_height;
+    video_frame->stride[0] = stridey;
+    video_frame->stride[1] = strideu;
+    video_frame->stride[2] = stridev;
+    video_frame->data_len[0] = stridey * src_height;
+    video_frame->data_len[1] = strideu * ((src_height + 1) / 2);
+    video_frame->data_len[2] = stridev * ((src_height + 1) / 2);
+    video_frame->data[1] = video_frame->data[0] + video_frame->data_len[0];
+    video_frame->data[2] = video_frame->data[1] + video_frame->data_len[1];
+
+    memcpy(video_frame->data[0], frame.video_frame_buffer()->GetI420()->DataY(), video_frame->data_len[0]);
+    memcpy(video_frame->data[1], frame.video_frame_buffer()->GetI420()->DataU(), video_frame->data_len[1]);
+    memcpy(video_frame->data[2], frame.video_frame_buffer()->GetI420()->DataV(), video_frame->data_len[2]);
+
+    if (0 == start_time_) {
+        start_time_ = frame.render_time_ms();
+
+    }
+
+    video_frame->ts = static_cast<uint32_t>(frame.render_time_ms() - start_time_);
+    video_frame->capture_time_ms = frame.render_time_ms();
+
+    //将处理后的视频帧通过异步任务分发给所有注册的消费者。
+    current_thread_->PostTask(webrtc::ToQueuedTask([=] {
+        for (auto consumer : consumer_list_) {
+            consumer->OnFrame(video_frame);
+        }
+        }));
 }
 
 //void CamImpl::OnFrame(const webrtc::VideoFrame& frame) {
