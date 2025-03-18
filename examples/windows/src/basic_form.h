@@ -5,6 +5,8 @@
 #include "stdafx.h"
 #include "xrtc/xrtc.h"
 
+#include "xrtc/media/chain/xrtc_preview.h"
+#include <xrtc/media/chain/xrtc_preview.h>
 
 class MainThread;
 
@@ -60,7 +62,8 @@ private:
 	// XRTCEngineObserver
 	void OnVideoSourceSuccess(xrtc::IVideoSource* video_source) override;
 	void OnVideoSourceFailed(xrtc::IVideoSource* video_source, xrtc::XRTCError err) override;
-	
+	void OnPreviewSuccess(xrtc::XRTCPreview*) override;
+	void OnPreviewFailed(xrtc::XRTCPreview*, xrtc::XRTCError err) override;
 
 private:
 	MainThread* ui_thread_;
@@ -75,6 +78,8 @@ private:
 
 	xrtc::IVideoSource* cam_source_ = nullptr;
 	std::atomic<bool> device_init_{false};
+	xrtc::XRTCPreview* xrtc_preview_ = nullptr;
+	xrtc::XRTCRender* xrtc_render_ = nullptr;
 	
 };
 

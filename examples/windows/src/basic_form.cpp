@@ -34,6 +34,7 @@ std::wstring BasicForm::GetWindowClassName() const
 void BasicForm::InitWindow()
 {
 	btn_device_start_ = dynamic_cast<ui::Button*>(FindControl(L"btn_device_start"));
+	btn_prev_ = dynamic_cast<ui::Button*>(FindControl(L"btn_device_start"));
 	xrtc::XRTCEngine::Init(this);
 	
 	InitComboCam();
@@ -186,16 +187,57 @@ bool BasicForm::StopDevice() {
 }
 
 void BasicForm::OnBtnPreviewClick() {
-	
+	btn_prev_->SetEnabled(false);
+
+	if (!xrtc_preview_) {
+		if (StartPreview()) {
+			btn_prev_->SetText(L"停止预览");
+		}
+	}
+	else {
+		if (StopPreview()) {
+			btn_prev_->SetText(L"本地预览");
+		}
+	}
+
+	btn_prev_->SetEnabled(true);
 	
 }
 
 bool BasicForm::StartPreview() {
-	
+	if (!cam_source_) {
+		ShowToast(L"预览失败：没有视频源",true);
 		return false;
+	}
+
+	HWND hwnd = nullptr;
+	CWndUI* local_video = dynamic_cast<CWndUI*>(FindControl(L"local"));
+	if (local_video) {
+		hwnd = local_video->GetVideoWnd();
+	}
+
+	if (!hwnd) {
+		ShowToast(L"预览失败：没有显示窗口", true);
+		return false;
+	}
+
+	xrtc_render_ = xrtc::XRTCEngine::CreateRender(hwnd);
+	xrtc_preview_ = xrtc::XRTCEngine::CreatePreview(cam_source_, xrtc_render_);
+	xrtc_preview_->Start();
+
+	return true;
 }
 
 bool BasicForm::StopPreview() {
+
+	if (!xrtc_preview_) {
+		return false;
+	}
+
+	xrtc_preview_->Stop();
+	xrtc_preview_ = nullptr;
+
+	ShowToast(L"停止本地预览成功", false);
 
 	return true;
 }
@@ -245,6 +287,27 @@ void BasicForm::OnVideoSourceFailed(xrtc::IVideoSource* video_source, xrtc::XRTC
 {
 	std::wstring wstr = nbase::StringPrintf(L"摄像头启动设备，err_code: %d", err);
 	ShowToast(wstr, true);
+}
+
+void BasicForm::OnPreviewSuccess(xrtc::XRTCPreview*)
+{
+	ShowToast(L"本地预览成功", false);
+}
+
+void BasicForm::OnPreviewFailed(xrtc::XRTCPreview*, xrtc::XRTCError err)
+{
+	std::wstring msg = nbase::StringPrintf(L"本地预览失败, err: %d", err);
+	ShowToast(msg, true);
+
+	if (xrtc_preview_) {
+		xrtc_preview_->Stop();
+		xrtc_preview_->Destroy();
+		xrtc_preview_ = nullptr;
+	}
+
+	CallOnUIThread([=] {
+		btn_prev_->SetText(L"本地预览");
+		});
 }
 
 

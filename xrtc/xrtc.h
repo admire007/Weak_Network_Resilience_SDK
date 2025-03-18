@@ -78,6 +78,8 @@ namespace xrtc
 	public:
 		virtual void OnVideoSourceSuccess(IVideoSource*) {}
 		virtual void OnVideoSourceFailed(IVideoSource*,XRTCError) {}
+		virtual void OnPreviewSuccess(XRTCPreview*) {}
+		virtual void OnPreviewFailed(XRTCPreview*, XRTCError) {}
 	};
 
 
@@ -90,13 +92,13 @@ namespace xrtc
 		static int32_t GetCameraInfo(int index, std::string& device_name,
 			std::string& device_id);
 		static IVideoSource* CreateCamSource(const std::string& cam_id);
-		
+		static XRTCRender* CreateRender(void* canvan);
+		static XRTCPreview* CreatePreview(IVideoSource* video_source,XRTCRender* render);//为了实现渲染，后续实现d3d9获取句柄时创建XRTCRender* render
+
 		// 音频设备
 		//static int16_t GetMicCount();
 		//static int32_t GetMicInfo(int index, std::string& mic_name, std::string& mic_guid);
 		//static IAudioSource* CreateMicSource(const std::string& mic_id);
-		//static XRTCRender* CreateRender(void* canvas);
-		//static XRTCPreview* CreatePreview(IVideoSource* video_source, XRTCRender* render);
 		//static XRTCPusher* CreatePusher(IAudioSource* audio_source, IVideoSource* video_source);
 
 	};
