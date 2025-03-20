@@ -10,6 +10,7 @@ file(GLOB all_src
 "./media/chain/*.cpp"
 "./media/source/*.cpp"
 "./media/sink/*.cpp"
+"./media/filter/*.cpp"
 
 )
 
@@ -33,7 +34,7 @@ if (CMAKE_SYSTEM_NAME MATCHES "Windows")
 	)
 endif()
 
-add_library(xrtc SHARED ${all_src} "xrtc.cpp" "xrtc.h" "device/cam_impl.cpp" "device/cam_impl.h" "device/xrtc_render.h"   "media/base/media_chain.cpp" "media/base/media_chain.h" "media/chain/xrtc_preview.cpp" "media/chain/xrtc_preview.h" "media/source/xrtc_video_source.cpp" "media/source/xrtc_video_source.h" "media/sink/d3d9_render_sink.cpp" "media/sink/d3d9_render_sink.h" "media/base/base_pin.h" "media/base/in_pin.cpp" "media/base/in_pin.h" "media/base/out_pin.cpp" "media/base/out_pin.h" "base/xrtc_json.cpp" "base/xrtc_json.h")
+add_library(xrtc SHARED ${all_src})
 target_link_libraries(xrtc
     absl_bad_optional_access
     absl_throw_delegate

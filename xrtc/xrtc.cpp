@@ -6,6 +6,7 @@
 #include "xrtc/device/cam_impl.h"
 #include "xrtc/device/xrtc_render.h"
 #include "xrtc/media/chain/xrtc_preview.h"
+#include "xrtc/media/base/xrtc_pusher.h"
 
 
 namespace xrtc {
@@ -57,6 +58,12 @@ namespace xrtc {
 	XRTCPreview* XRTCEngine::CreatePreview(IVideoSource* video_source, XRTCRender* render) {
 		return XRTCGlobal::Instance()->api_thread()->Invoke<XRTCPreview*>(RTC_FROM_HERE, [=]() {
 			return new XRTCPreview(video_source, render);
+			});
+	}
+
+	XRTCPusher* XRTCEngine::CreatePusher(IVideoSource* video_source) {
+		return XRTCGlobal::Instance()->api_thread()->Invoke<XRTCPusher*>(RTC_FROM_HERE, [=]() {
+			return new XRTCPusher(video_source);
 			});
 	}
 	

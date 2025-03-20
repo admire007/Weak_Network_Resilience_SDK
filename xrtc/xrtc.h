@@ -60,9 +60,9 @@ namespace xrtc
 	};
 
 	//视频源
-	class IVideoSource {
+	class IMediaSource {
 	public:
-		virtual ~IVideoSource() {}
+		virtual ~IMediaSource() {}
 		virtual void Start() = 0;
 		virtual void Setup(const std::string& json_config) = 0;//设置摄像头采集参数
 		virtual void Stop() = 0;
@@ -74,12 +74,22 @@ namespace xrtc
 
 	};
 
+	class IAudioSource : public IMediaSource {
+
+	};
+
+	class IVideoSource : public IMediaSource {
+
+	};
+
 	class XRTC_API XRTCEngineObserver {
 	public:
 		virtual void OnVideoSourceSuccess(IVideoSource*) {}
 		virtual void OnVideoSourceFailed(IVideoSource*,XRTCError) {}
 		virtual void OnPreviewSuccess(XRTCPreview*) {}
 		virtual void OnPreviewFailed(XRTCPreview*, XRTCError) {}
+		virtual void OnPushSuccess(XRTCPusher*) {}
+		virtual void OnPushFailed(XRTCPusher*, XRTCError) {}
 	};
 
 
@@ -94,6 +104,9 @@ namespace xrtc
 		static IVideoSource* CreateCamSource(const std::string& cam_id);
 		static XRTCRender* CreateRender(void* canvan);
 		static XRTCPreview* CreatePreview(IVideoSource* video_source,XRTCRender* render);//为了实现渲染，后续实现d3d9获取句柄时创建XRTCRender* render
+		static XRTCPusher* CreatePusher(IVideoSource* video_source);
+
+
 
 		// 音频设备
 		//static int16_t GetMicCount();

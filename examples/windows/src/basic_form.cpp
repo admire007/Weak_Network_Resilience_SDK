@@ -35,6 +35,10 @@ void BasicForm::InitWindow()
 {
 	btn_device_start_ = dynamic_cast<ui::Button*>(FindControl(L"btn_device_start"));
 	btn_prev_ = dynamic_cast<ui::Button*>(FindControl(L"btn_device_start"));
+	btn_push_ = dynamic_cast<ui::Button*>(FindControl(L"btn_push"));
+	edit_host_ = dynamic_cast<ui::RichEdit*>(FindControl(L"edit_xrtc_host"));
+	edit_uid_ = dynamic_cast<ui::RichEdit*>(FindControl(L"edit_uid"));
+	edit_stream_name_ = dynamic_cast<ui::RichEdit*>(FindControl(L"edit_stream_name"));
 	xrtc::XRTCEngine::Init(this);
 	
 	InitComboCam();
@@ -244,15 +248,48 @@ bool BasicForm::StopPreview() {
 
 void BasicForm::OnBtnPushClick() {
 	
-	btn_push_->SetText(L"开始推流");
+	btn_push_->SetEnabled(false);
+	if (!xrtc_pusher_) {
+		if (StartPush()) {
+			btn_push_->SetText(L"停止推流");
+		}
+	}
+	else {
+		if (StopPush()) {
+			btn_push_->SetText(L"开始推流");
+		}
+	}
+
+	btn_push_->SetEnabled(true);
 }
 
 bool BasicForm::StartPush() {
-	
+
+	if (!cam_source_) {
+		ShowToast(L"推流失败：没有视频源", true);
+		return false;
+	}
+
+	// xrtc://www.str2num.com/push?uid=xxx&stremaName=xxx
+	std::string url = "xrtc://" + nbase::UTF16ToUTF8(edit_host_->GetText())
+		+ "/push?uid=" + nbase::UTF16ToUTF8(edit_uid_->GetText())
+		+ "&streamName=" + nbase::UTF16ToUTF8(edit_stream_name_->GetText());
+
+	xrtc_pusher_ = xrtc::XRTCEngine::CreatePusher(cam_source_);
+	xrtc_pusher_->StartPush(url);
+
 	return true;
 }
 
 bool BasicForm::StopPush() {
+
+	if (!xrtc_pusher_) {
+		return true;
+	}
+
+	xrtc_pusher_->StopPush();
+	xrtc_pusher_->Destroy();
+	xrtc_pusher_ = nullptr;
 
 	return true;
 }
@@ -308,6 +345,17 @@ void BasicForm::OnPreviewFailed(xrtc::XRTCPreview*, xrtc::XRTCError err)
 	CallOnUIThread([=] {
 		btn_prev_->SetText(L"本地预览");
 		});
+}
+
+void BasicForm::OnPushSuccess(xrtc::XRTCPusher*)
+{
+	ShowToast(L"xrtc推流成功", false);
+}
+
+void BasicForm::OnPushFailed(xrtc::XRTCPusher*, xrtc::XRTCError err)
+{
+	std::wstring err_msg = nbase::StringPrintf(L"xrtc推流失败，err: %d", err);
+	ShowToast(err_msg, true);
 }
 
 
