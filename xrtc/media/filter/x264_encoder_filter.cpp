@@ -6,6 +6,11 @@
 #include "xrtc/media/base/in_pin.h"
 #include "xrtc/media/base/out_pin.h"
 
+
+static std::mutex log_mutex;
+static std::chrono::system_clock::time_point last_log_time = std::chrono::system_clock::now();
+static std::string last_log_message;
+
 namespace xrtc {
 
 X264EncoderFilter::X264EncoderFilter() :
@@ -138,7 +143,10 @@ static void LogX264(void*, int level, const char* format, va_list args) {
     }
     va_end(args2);
 
-    RTC_LOG(LS_INFO) << "x264 log, level: " << level << ", msg: " << buf;
+    std::string current_message = std::string("x264 log, level: ") + std::to_string(level) + ", msg: " + buf;
+        // 打印日志
+        RTC_LOG(LS_INFO) << current_message;
+
 }
 
 bool X264EncoderFilter::InitEncoder() {

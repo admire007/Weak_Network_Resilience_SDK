@@ -1,6 +1,7 @@
 ﻿#include "xrtc/base/xrtc_global.h"
 
 #include <modules/video_capture/video_capture_factory.h>
+#include "xrtc/base/xrtc_http.h"
 
 
 namespace xrtc {
@@ -25,6 +26,10 @@ XRTCGlobal::XRTCGlobal() :
 
     network_thread_->SetName("network_thread", nullptr);
     network_thread_->Start();
+
+    http_manager_ = new HttpManager();
+    http_manager_->Start();
+
 
 }
 

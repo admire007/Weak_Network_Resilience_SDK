@@ -32,6 +32,8 @@ public:
     virtual void Start() = 0;
     virtual void Stop() = 0;
     virtual void Destroy() = 0;
+    virtual void OnChainSuccess() {}
+    virtual void OnChainFailed(MediaObject*, XRTCError) {}
 
 protected:
     void AddMediaObject(MediaObject* obj);

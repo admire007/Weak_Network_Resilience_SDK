@@ -11,6 +11,7 @@ file(GLOB all_src
 "./media/source/*.cpp"
 "./media/sink/*.cpp"
 "./media/filter/*.cpp"
+"./rtc/pc/*.cpp"
 
 )
 
@@ -34,7 +35,7 @@ if (CMAKE_SYSTEM_NAME MATCHES "Windows")
 	)
 endif()
 
-add_library(xrtc SHARED ${all_src})
+add_library(xrtc SHARED ${all_src} )
 target_link_libraries(xrtc
     absl_bad_optional_access
     absl_throw_delegate

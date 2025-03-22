@@ -30,6 +30,8 @@ public:
         return video_device_info_.get();
     }
 
+    HttpManager* http_manager() { return http_manager_; }
+
 private:
     XRTCGlobal();
     ~XRTCGlobal();
@@ -40,6 +42,7 @@ private:
     std::unique_ptr<rtc::Thread> network_thread_;
     std::unique_ptr<webrtc::VideoCaptureModule::DeviceInfo> video_device_info_;
     XRTCEngineObserver* engine_observer_ = nullptr;
+    HttpManager* http_manager_ = nullptr;
 };
 
 } // namespace xrtc

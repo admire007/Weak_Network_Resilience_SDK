@@ -5,6 +5,7 @@
 #include "xrtc/base/xrtc_json.h"
 #include "xrtc/media/base/xrtc_pusher.h"
 #include "xrtc/base/xrtc_global.h"
+#include "xrtc/base/xrtc_json.h"
 
 namespace xrtc {
 
@@ -17,7 +18,7 @@ XRTCPushStream::XRTCPushStream(XRTCPusher* pusher, IVideoSource* video_source) :
     //audio_processing_filter_(std::make_unique<AudioProcessingFilter>()),
     //opus_encoder_filter_(std::make_unique<OpusEncoderFilter>()),
     x264_encoder_filter_(std::make_unique<X264EncoderFilter>())
-    //,xrtc_media_sink_(std::make_unique<XRTCMediaSink>(this))
+    ,xrtc_media_sink_(std::make_unique<XRTCMediaSink>(this))
 {
 }
 
@@ -43,12 +44,29 @@ void XRTCPushStream::Start() {
             AddMediaObject(xrtc_video_source_.get());
             AddMediaObject(x264_encoder_filter_.get());
         }
+        AddMediaObject(xrtc_media_sink_.get());
 
-        if (!ConnectMediaObject(xrtc_video_source_.get(), x264_encoder_filter_.get())) {
-            err = XRTCError::kChainConnectErr;
-            RTC_LOG(LS_WARNING) << "xrtc_video_source connect to x264_encoder_filter failed";
-            break;
+        if (video_source_) {
+            if (!ConnectMediaObject(xrtc_video_source_.get(), x264_encoder_filter_.get())) {
+                err = XRTCError::kChainConnectErr;
+                RTC_LOG(LS_WARNING) << "xrtc_video_source connect to x264_encoder_filter failed";
+                break;
+            }
+
+
+            if (!ConnectMediaObject(x264_encoder_filter_.get(), xrtc_media_sink_.get())) {
+                err = XRTCError::kChainConnectErr;
+                RTC_LOG(LS_WARNING) << "x264_encoder_filter_ connect to xrtc_media_sink_ failed";
+                break;
+            }
         }
+
+        //安装参数
+        JsonObject jobj;
+        JsonObject j_xrtc_media_sink;
+        j_xrtc_media_sink["url"] = pusher_->Url();
+        jobj["xrtc_media_sink"] = j_xrtc_media_sink;
+        SetupChain(JsonValue(jobj).ToJson());
 
         if (!StartChain()) {
             err = XRTCError::kChainStartErr;
@@ -79,6 +97,20 @@ void XRTCPushStream::Stop() {
 }
 
 void XRTCPushStream::Destroy() {
+}
+
+void XRTCPushStream::OnChainSuccess()
+{
+    if (XRTCGlobal::Instance()->engine_observer()) {
+        XRTCGlobal::Instance()->engine_observer()->OnPushSuccess(pusher_);
+    }
+}
+
+void XRTCPushStream::OnChainFailed(MediaObject*, XRTCError err)
+{
+    if (XRTCGlobal::Instance()->engine_observer()) {
+        XRTCGlobal::Instance()->engine_observer()->OnPushFailed(pusher_, err);
+    }
 }
 
 
