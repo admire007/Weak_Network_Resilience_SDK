@@ -11,7 +11,8 @@
 
 namespace xrtc {
 
-PeerConnection::PeerConnection() 
+PeerConnection::PeerConnection() :
+    transport_controller_(std::make_unique<TransportController>())
   
 {
 }
@@ -188,11 +189,109 @@ ContentGroup类通常用于表示SDP中的组信息，比如BUNDLE组。*/
         //    }
         //}
 
-        //transport_controller_->SetRemoteSDP(remote_desc_.get());
+        transport_controller_->SetRemoteSDP(remote_desc_.get());//将解析的sdp设置到transport_controller
 
         return 0;
-    };
+    }
+
+    static RtpDirection GetDirection(bool send, bool recv) {
+        if (send && recv) {
+            return RtpDirection::kSendRecv;
+        }
+        else if (send && !recv) {
+            return RtpDirection::kSendOnly;
+        }
+        else if (!send && recv) {
+            return RtpDirection::kRecvOnly;
+        }
+        else {
+            return RtpDirection::kInactive;
+        }
+    }
+
+    std::string PeerConnection::CreateAnswer(const RTCOfferAnswerOptions& options, const std::string& stream_id)
+    {
+        local_desc_ = std::make_unique<SessionDescription>(SdpType::kAnswer);
+
+        ice::IceParameters ice_param = ice::IceCredentials::CreateRandomIceCredentials();
+        std::string cname = rtc::CreateRandomString(16);
+
+        if (options.send_audio || options.recv_audio) {
+            auto audio_content = std::make_shared<AudioContentDescription>();
+            audio_content->set_direction(GetDirection(options.send_audio, options.recv_audio));
+            audio_content->set_rtcp_mux(options.use_rtcp_mux);
+            local_desc_->AddContent(audio_content);
+            local_desc_->AddTransportInfo(audio_content->mid(),ice_param);
+            
+            // 如果发送音频，需要创建stream
+              if (options.send_audio) {
+                  StreamParams audio_stream;
+                  audio_stream.id = rtc::CreateRandomString(16);
+                  audio_stream.stream_id = stream_id;
+                  audio_stream.cname = cname;
+                  local_audio_ssrc_ = rtc::CreateRandomId();
+                  audio_stream.ssrcs.push_back(local_audio_ssrc_);
+                  audio_content->AddStream(audio_stream);
+
+        
+              }
+        }
+
+        if (options.send_video || options.recv_video) {
+            auto video_content = std::make_shared<VideoContentDescription>();
+            video_content->set_direction(GetDirection(options.send_video, options.recv_video));
+            video_content->set_rtcp_mux(options.use_rtcp_mux);
+            local_desc_->AddContent(video_content);
+            local_desc_->AddTransportInfo(video_content->mid(), ice_param);
+         
+            // 如果发送视频，需要创建stream
+            if (options.send_video) {
+                std::string id = rtc::CreateRandomString(16);
+                StreamParams video_stream;
+                video_stream.id = id;
+                video_stream.stream_id = stream_id;
+                video_stream.cname = cname;
+                local_video_ssrc_ = rtc::CreateRandomId();
+                local_video_rtx_ssrc_ = rtc::CreateRandomId();
+                video_stream.ssrcs.push_back(local_video_ssrc_);
+                video_stream.ssrcs.push_back(local_video_rtx_ssrc_);
+                
+
+                // 分组
+                SsrcGroup sg;
+                sg.semantics = "FID";
+                sg.ssrcs.push_back(local_video_ssrc_);
+                sg.ssrcs.push_back(local_video_rtx_ssrc_);
+                video_stream.ssrc_groups.push_back(sg);
+
+                video_content->AddStream(video_stream);
+
+                // 创建rtx stream
+                StreamParams video_rtx_stream;
+                video_rtx_stream.id = id;
+                video_rtx_stream.stream_id = stream_id;
+                video_rtx_stream.cname = cname;
+                video_rtx_stream.ssrcs.push_back(local_video_rtx_ssrc_);
+                video_content->AddStream(video_rtx_stream);
+            }
+        
+        }
 
 
+        // 创建BUNDLE
+        if (options.use_rtp_mux) {
+            ContentGroup answer_bundle("BUNDLE");
+            for (auto content : local_desc_->contents()) {
+                answer_bundle.AddContentName(content->mid());
+            }
+
+            if (!answer_bundle.content_names().empty()) {
+                local_desc_->AddGroup(answer_bundle);
+            }
+        }
+
+
+        return local_desc_->ToString();//文本转换为SDP格式
+    }
 
 } // namespace xrtc

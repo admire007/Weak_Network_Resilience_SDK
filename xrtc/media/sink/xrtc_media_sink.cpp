@@ -76,11 +76,12 @@ bool XRTCMediaSink::Start() {
             return;
         }
 
-        //RTCOfferAnswerOptions options;
-        //options.recv_audio = false;
-        //options.recv_video = false;
-        //std::string answer = pc_->CreateAnswer(options, request_params_["uid"]);
-        //SendAnswer(answer);
+        //因为不需要拉流，所以禁用
+        RTCOfferAnswerOptions options;
+        options.recv_audio = false;
+        options.recv_video = false;
+        std::string answer = pc_->CreateAnswer(options,request_params_["uid_"]);
+        SendAnswer(answer);
 
     }, this);
 

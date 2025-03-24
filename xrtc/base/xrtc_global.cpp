@@ -30,6 +30,9 @@ XRTCGlobal::XRTCGlobal() :
     http_manager_ = new HttpManager();
     http_manager_->Start();
 
+    ice::NetworkConfig config;//配置选项，禁用一些不需要的端口等
+    port_allocator_ = std::make_unique<ice::PortAllocator>(config);
+
 
 }
 

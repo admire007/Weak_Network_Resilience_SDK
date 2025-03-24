@@ -9,12 +9,23 @@
 #include <ice/candidate.h>
 #include <ice/ice_credentials.h>
 
+#include <xrtc/rtc/pc/codec_info.h>
+#include "xrtc/rtc/pc/stream_params.h"
+
 
 namespace xrtc {
 
 enum class SdpType {
     kOffer,
     kAnswer,
+};
+
+//传输方向
+enum class RtpDirection {
+    kSendRecv,
+    kSendOnly,
+    kRecvOnly,
+    kInactive,
 };
 
 class ContentGroup {
@@ -45,6 +56,10 @@ public:
     virtual ~MediaContentDescription() {}
     virtual webrtc::MediaType type() = 0;
     virtual std::string mid() = 0;
+    
+    const std::vector<std::shared_ptr<CodecInfo>>& codecs() {
+        return codecs_;
+    }
 
     const std::vector<ice::Candidate>& candidates() {
         return candidates_;
@@ -54,8 +69,23 @@ public:
         candidates_.push_back(c);
     }
 
+    RtpDirection direction() { return direction_; }
+    void set_direction(RtpDirection direction) { direction_ = direction; }
+
+    bool rtcp_mux() { return rtcp_mux_; }
+    void set_rtcp_mux(bool value) { rtcp_mux_ = value; }
+
+    const std::vector<StreamParams>& streams() { return send_streams_; }
+    void AddStream(const StreamParams& stream) {
+        send_streams_.push_back(stream);
+    }
+
 protected:
     std::vector<ice::Candidate> candidates_;
+    std::vector<std::shared_ptr<CodecInfo>> codecs_;
+    RtpDirection direction_ = RtpDirection::kInactive;
+    bool rtcp_mux_ = true;
+    std::vector<StreamParams> send_streams_;
 
 };
 
@@ -80,9 +110,14 @@ public:
     SessionDescription(SdpType type);
     ~SessionDescription();
     
+    const std::vector<std::shared_ptr<MediaContentDescription>>& contents() {
+        return contents_;
+    }
     void AddContent(std::shared_ptr<MediaContentDescription> content) {
         contents_.push_back(content);
     }
+
+    const ContentGroup* GetGroupByName(const std::string& name);
 
     void AddGroup(const ContentGroup& group) {
         content_groups_.push_back(group);
@@ -91,6 +126,11 @@ public:
     std::shared_ptr<TransportDescription> GetTransportInfo(const std::string transport_name);
     void AddTransportInfo(std::shared_ptr<TransportDescription> td);
     void AddTransportInfo(const std::string& mid, const ice::IceParameters& ice_param);
+
+    bool IsBundle(const std::string& mid);
+    std::string GetFirstBundleId();
+
+    std::string ToString();
 
 private:
     SdpType sdp_type_;

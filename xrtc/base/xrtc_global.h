@@ -31,6 +31,7 @@ public:
     }
 
     HttpManager* http_manager() { return http_manager_; }
+    ice::PortAllocator* port_allocator() { return port_allocator_.get(); }
 
 private:
     XRTCGlobal();
@@ -43,6 +44,7 @@ private:
     std::unique_ptr<webrtc::VideoCaptureModule::DeviceInfo> video_device_info_;
     XRTCEngineObserver* engine_observer_ = nullptr;
     HttpManager* http_manager_ = nullptr;
+    std::unique_ptr<ice::PortAllocator> port_allocator_;
 };
 
 } // namespace xrtc
