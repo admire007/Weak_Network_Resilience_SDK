@@ -290,8 +290,43 @@ ContentGroup类通常用于表示SDP中的组信息，比如BUNDLE组。*/
             }
         }
 
-
+        transport_controller_->SetLocalSDP(local_desc_.get());//设置本地SDP
         return local_desc_->ToString();//文本转换为SDP格式
+    }
+
+    void PeerConnection::OnIceState(TransportController*, ice::IceTransportState ice_state)
+    {
+        PeerConnectionState pc_state = PeerConnectionState::kNew;
+        switch (ice_state) {
+        case ice::IceTransportState::kNew:
+            pc_state = PeerConnectionState::kNew;
+            break;
+        case ice::IceTransportState::kChecking:
+            pc_state = PeerConnectionState::kConnecting;
+            break;
+        case ice::IceTransportState::kConnected:
+        case ice::IceTransportState::kCompleted:
+            pc_state = PeerConnectionState::kConnected;
+            break;
+        case ice::IceTransportState::kDisconnected:
+            pc_state = PeerConnectionState::kDisconnected;
+            break;
+        case ice::IceTransportState::kFailed:
+            pc_state = PeerConnectionState::kFailed;
+            break;
+        case ice::IceTransportState::kClosed:
+            pc_state = PeerConnectionState::kClosed;
+            break;
+        default:
+            break;
+        }
+
+        if (pc_state != pc_state_) {
+            RTC_LOG(LS_INFO) << "peerconnection state change, from " << pc_state_
+                << "=>" << pc_state;
+            pc_state_ = pc_state;
+            SignalConnectionState(this, pc_state);
+        }
     }
 
 } // namespace xrtc

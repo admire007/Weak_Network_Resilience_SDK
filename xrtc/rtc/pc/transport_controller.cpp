@@ -9,6 +9,10 @@ TransportController::TransportController() :
     ice_agent_(new ice::IceAgent(XRTCGlobal::Instance()->network_thread(),
         XRTCGlobal::Instance()->port_allocator()))
 {
+    ice_agent_->SignalIceState.connect(this,
+        &TransportController::OnIceState);
+    ice_agent_->SignalReadPacket.connect(this,
+        &TransportController::OnReadPacket);
  
 }
 
@@ -57,6 +61,41 @@ int TransportController::SetRemoteSDP(SessionDescription* desc) {
     }
 
     return 0;
+}
+
+int TransportController::SetLocalSDP(SessionDescription* desc)
+{
+    if (!desc) {
+        return -1;
+    }
+
+    for (auto content : desc->contents()) {
+        std::string mid = content->mid();
+        if (desc->IsBundle(mid) && mid != desc->GetFirstBundleId()) {
+            continue;
+        }
+
+        auto td = desc->GetTransportInfo(mid);
+        if (td) {
+            ice_agent_->SetIceParams(mid, 1, ice::IceParameters(td->ice_ufrag,td->ice_pwd));
+        }
+
+    }
+    ice_agent_->GatheringCandidate();
+    return 0;
+}
+
+int TransportController::SendPacket(const std::string& transport_name, const char* data, size_t len)
+{
+    return 0;
+}
+
+void TransportController::OnIceState(ice::IceAgent*, ice::IceTransportState icee_state)
+{
+}
+
+void TransportController::OnReadPacket(ice::IceAgent*, const std::string&, int, const char* data, size_t len, int64_t ts)
+{
 }
 
 

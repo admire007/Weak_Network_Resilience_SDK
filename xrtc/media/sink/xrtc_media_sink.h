@@ -23,7 +23,7 @@ public:
     bool Start() override;
     void Setup(const std::string& /*json_config*/) override;
     void Stop() override;
-    //void OnNewMediaFrame(std::shared_ptr<MediaFrame>) override;
+    void OnNewMediaFrame(std::shared_ptr<MediaFrame>) override;
     std::vector<InPin*> GetAllInPins() override {
         return std::vector<InPin*>({ video_in_pin_.get() });
     }
@@ -37,6 +37,7 @@ private:
     bool ParseReply(const HttpReply& reply, std::string& type, std::string& sdp);
     void SendAnswer(const std::string& answer);
     void SendStop();
+    void PacketAndSendVideo(std::shared_ptr<MediaFrame> frame);
 
 private:
     MediaChain* media_chain_;

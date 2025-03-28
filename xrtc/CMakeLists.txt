@@ -35,7 +35,7 @@ if (CMAKE_SYSTEM_NAME MATCHES "Windows")
 	)
 endif()
 
-add_library(xrtc SHARED ${all_src}  "rtc/pc/transport_controller.cpp" "rtc/pc/transport_controller.h" "rtc/pc/codec_info.h" "rtc/pc/stream_params.h")
+add_library(xrtc SHARED ${all_src}  "rtc/pc/transport_controller.cpp" "rtc/pc/transport_controller.h" "rtc/pc/codec_info.h" "rtc/pc/stream_params.h" "rtc/pc/peer_connection_def.h")
 target_link_libraries(xrtc
     absl_bad_optional_access
     absl_throw_delegate

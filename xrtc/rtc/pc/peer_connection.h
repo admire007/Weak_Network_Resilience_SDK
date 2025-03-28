@@ -6,6 +6,7 @@
 
 #include "xrtc/rtc/pc/session_description.h"
 #include "xrtc/rtc/pc/transport_controller.h"
+#include "xrtc/rtc/pc/peer_connection_def.h"
 
 
 
@@ -21,7 +22,7 @@ namespace xrtc {
 
     };
 
-    class PeerConnection
+    class PeerConnection :public sigslot::has_slots<>
 
     {
     public:
@@ -31,6 +32,12 @@ namespace xrtc {
         int SetRemoteSDP(const std::string& sdp);
         std::string CreateAnswer(const RTCOfferAnswerOptions& options, const std::string& stream_id);
 
+        sigslot::signal2<PeerConnection*, PeerConnectionState> SignalConnectionState;
+        sigslot::signal5<PeerConnection*, int64_t, int32_t, uint8_t, uint32_t>
+            SignalNetworkInfo;
+
+    private :
+        void OnIceState(TransportController*, ice::IceTransportState ice_state);
     private:
         std::unique_ptr<SessionDescription> remote_desc_;
         std::unique_ptr<SessionDescription> local_desc_;
@@ -42,6 +49,8 @@ namespace xrtc {
         uint32_t audio_pt_ = 0;
         uint8_t video_pt_ = 0;
         uint8_t video_rtx_pt_ = 0;
+
+        PeerConnectionState pc_state_ = PeerConnectionState::kNew;
 
     };
 
