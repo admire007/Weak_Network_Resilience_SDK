@@ -87,7 +87,7 @@ int TransportController::SetLocalSDP(SessionDescription* desc)
 
 int TransportController::SendPacket(const std::string& transport_name, const char* data, size_t len)
 {
-    return 0;
+    return ice_agent_->SendPacket(transport_name, 1, data, len);
 }
 
 void TransportController::OnIceState(ice::IceAgent*, ice::IceTransportState icee_state)

@@ -8,6 +8,7 @@
 #include "xrtc/media/base/in_pin.h"
 #include "xrtc/base/xrtc_utils.h"
 #include "xrtc/base/xrtc_http.h"
+#include "xrtc/rtc/modules/rtp_rtcp/rtp_format_h264.h"
 
 
 namespace xrtc {
@@ -232,6 +233,7 @@ void XRTCMediaSink::SendStop() {
 
 void XRTCMediaSink::PacketAndSendVideo(std::shared_ptr<MediaFrame> frame)
 {
+    pc_->SendEncodeImage(frame);
 
 }
 

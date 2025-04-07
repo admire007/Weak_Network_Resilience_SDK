@@ -12,6 +12,7 @@ file(GLOB all_src
 "./media/sink/*.cpp"
 "./media/filter/*.cpp"
 "./rtc/pc/*.cpp"
+"./rtc/modules/rtc_rtcp/*.cpp"
 
 )
 
@@ -35,7 +36,7 @@ if (CMAKE_SYSTEM_NAME MATCHES "Windows")
 	)
 endif()
 
-add_library(xrtc SHARED ${all_src}  "rtc/pc/transport_controller.cpp" "rtc/pc/transport_controller.h" "rtc/pc/codec_info.h" "rtc/pc/stream_params.h" "rtc/pc/peer_connection_def.h")
+add_library(xrtc SHARED ${all_src}  "rtc/pc/transport_controller.cpp" "rtc/pc/transport_controller.h" "rtc/pc/codec_info.h" "rtc/pc/stream_params.h" "rtc/pc/peer_connection_def.h"          "rtc/modules/rtp_rtcp/rtp_format.cpp" "rtc/modules/rtp_rtcp/rtp_format.h" "rtc/modules/rtp_rtcp/rtp_format_h264.cpp" "rtc/modules/rtp_rtcp/rtp_format_h264.h"   "rtc/modules/rtp_rtcp/rtp_packet_to_send.cpp" "rtc/modules/rtp_rtcp/rtp_packet_to_send.h" "rtc/modules/rtp_rtcp/rtp_packet.cpp" "rtc/modules/rtp_rtcp/rtp_packet.h")
 target_link_libraries(xrtc
     absl_bad_optional_access
     absl_throw_delegate

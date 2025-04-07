@@ -8,6 +8,9 @@
 #include <ice/candidate.h>
 
 #include "xrtc/base/xrtc_global.h"
+#include "xrtc/rtc/modules/rtp_rtcp/rtp_packet_to_send.h"
+#include "xrtc/rtc/modules/rtp_rtcp/rtp_format_h264.h"
+
 
 namespace xrtc {
 
@@ -178,16 +181,16 @@ ContentGroup类通常用于表示SDP中的组信息，比如BUNDLE组。*/
         remote_desc_->AddTransportInfo(audio_td);
         remote_desc_->AddTransportInfo(video_td);
 
-        //if (video_content) {
-        //    auto video_codecs = video_content->codecs();
-        //    if (!video_codecs.empty()) {
-        //        video_pt_ = video_codecs[0]->id;
-        //    }
+        if (video_content) {
+            auto video_codecs = video_content->codecs();
+            if (!video_codecs.empty()) {
+                video_pt_ = video_codecs[0]->id;
+            }
 
-        //    if (video_codecs.size() > 1) {
-        //        video_rtx_pt_ = video_codecs[1]->id;
-        //    }
-        //}
+            if (video_codecs.size() > 1) {
+                video_rtx_pt_ = video_codecs[1]->id;
+            }
+        }
 
         transport_controller_->SetRemoteSDP(remote_desc_.get());//将解析的sdp设置到transport_controller
 
@@ -292,6 +295,47 @@ ContentGroup类通常用于表示SDP中的组信息，比如BUNDLE组。*/
 
         transport_controller_->SetLocalSDP(local_desc_.get());//设置本地SDP
         return local_desc_->ToString();//文本转换为SDP格式
+    }
+
+    bool PeerConnection::SendEncodeImage(std::shared_ptr<MediaFrame> frame)
+    {
+        if (pc_state_ != PeerConnectionState::kConnected) {
+            return true;
+        }
+
+        // 视频的频率90000, 1s中90000份 1ms => 90
+        uint32_t rtp_timestamp = frame->ts * 90;
+
+        /*if (video_send_stream_) {
+            video_send_stream_->OnSendingRtpFrame(rtp_timestamp,
+                frame->capture_time_ms,
+                frame->fmt.sub_fmt.video_fmt.idr);
+        }*/
+
+        RtpPacketizer::Config config;
+        auto packetizer = RtpPacketizer::Create(webrtc::kVideoCodecH264,
+            rtc::ArrayView<const uint8_t>((uint8_t*)frame->data[0], frame->data_len[0]),
+            config);
+
+        while (true) {
+            auto single_packet = std::make_shared<RtpPacketToSend>();
+            single_packet->SetPayloadType(video_pt_);
+            single_packet->SetTimestamp(rtp_timestamp);
+            single_packet->SetSsrc(local_video_ssrc_);
+
+            if (!packetizer->NextPacket(single_packet.get())) {
+                break;
+            }
+
+            single_packet->SetSequenceNumber(video_seq_++);
+
+            // 发送数据包
+            // TODO, transport_name此处写死，后面可以换成变量
+            transport_controller_->SendPacket("audio", (const char*)single_packet->data(),
+                single_packet->size());
+        }
+
+        return true;
     }
 
     void PeerConnection::OnIceState(TransportController*, ice::IceTransportState ice_state)
