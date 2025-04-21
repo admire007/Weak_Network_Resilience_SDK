@@ -11,167 +11,192 @@
 #include "xrtc/rtc/modules/rtp_rtcp/rtp_packet_to_send.h"
 #include "xrtc/rtc/modules/rtp_rtcp/rtp_format_h264.h"
 
-
-namespace xrtc {
-
-PeerConnection::PeerConnection() :
-    transport_controller_(std::make_unique<TransportController>())
-  
+namespace xrtc
 {
-}
 
-PeerConnection::~PeerConnection() {
-  
-}
-
-//a=attr_name:attr_value
-static std::string GetAttribute(const std::string& line) {
-    std::vector<std::string> fields;
-    size_t size = rtc::tokenize(line,':',&fields);
-    if (size != 2) {
-        RTC_LOG(LS_WARNING) << "get attribute failed: " << line;
-        return "";
-
+    PeerConnection::PeerConnection() : transport_controller_(std::make_unique<TransportController>()),
+                                       clock_(webrtc::Clock::GetRealTimeClock())
+    {
+        transport_controller_->SignalIceState.connect(this, &PeerConnection::OnIceState);
     }
-    return fields[1];
-}
 
-static bool ParseCandidates(MediaContentDescription* media_content,
-    const std::string& line)
-{
-    if (line.find("a=candidate:") == std::string::npos) {
+    PeerConnection::~PeerConnection()
+    {
+    }
+
+    // a=attr_name:attr_value
+    static std::string GetAttribute(const std::string &line)
+    {
+        std::vector<std::string> fields;
+        size_t size = rtc::tokenize(line, ':', &fields);
+        if (size != 2)
+        {
+            RTC_LOG(LS_WARNING) << "get attribute failed: " << line;
+            return "";
+        }
+        return fields[1];
+    }
+
+    static bool ParseCandidates(MediaContentDescription *media_content,
+                                const std::string &line)
+    {
+        if (line.find("a=candidate:") == std::string::npos)
+        {
+            return true;
+        }
+
+        std::string attr_value = GetAttribute(line);
+        if (attr_value.empty())
+        {
+            return false;
+        }
+
+        std::vector<std::string> fields;
+        size_t size = rtc::tokenize(attr_value, ' ', &fields);
+        if (size < 8)
+        {
+            return false;
+        }
+
+        ice::Candidate c;
+        c.foundation = fields[0];
+        c.component = std::atoi(fields[1].c_str());
+        c.protocol = fields[2];
+        c.priority = std::atoi(fields[3].c_str());
+        c.port = std::atoi(fields[5].c_str());
+        c.address = rtc::SocketAddress(fields[4], c.port);
+        c.type = fields[7];
+
+        media_content->AddCandidate(c);
         return true;
     }
 
-    std::string attr_value = GetAttribute(line);
-    if (attr_value.empty()) {
-        return false;
-    }
-
-    std::vector<std::string> fields;
-    size_t size = rtc::tokenize(attr_value, ' ', &fields);
-    if (size < 8) {
-        return false;
-    }
-
-    ice::Candidate c;
-    c.foundation = fields[0];
-    c.component = std::atoi(fields[1].c_str());
-    c.protocol = fields[2];
-    c.priority = std::atoi(fields[3].c_str());
-    c.port = std::atoi(fields[5].c_str());
-    c.address = rtc::SocketAddress(fields[4], c.port);
-    c.type = fields[7];
-
-    media_content->AddCandidate(c);
-    return true;
-}
-
-static bool ParseTransportInfo(TransportDescription* td,
-    const std::string& line)
-{
-    if (line.find("a=ice-ufrag") != std::string::npos) {
-        td->ice_ufrag = GetAttribute(line);
-        if (td->ice_ufrag.empty()) {
-            return false;
-        }
-    }
-    else if (line.find("a=ice-pwd") != std::string::npos) {
-        td->ice_pwd = GetAttribute(line);
-        if (td->ice_pwd.empty()) {
-            return false;
-        }
-    }
-
-    return true;
-}
-
-int PeerConnection::SetRemoteSDP(const std::string& sdp) {
-    std::vector<std::string> fields;
-    // SDP用\n, \r\n来换行的
-    rtc::tokenize(sdp, '\n', &fields);
-    if (fields.size() <= 0) {
-        RTC_LOG(LS_WARNING) << "invalid sdp: " << sdp;
-        return -1;
-    }
-
-    // 判断是否是\r\n换行
-    bool is_rn = false;
-    if (sdp.find("\r\n") != std::string::npos) {
-        is_rn = true;
-    }
-
-    remote_desc_ = std::make_unique<SessionDescription>(SdpType::kOffer);
-
-    std::string mid;
-    //保存M行的信息
-    auto audio_content = std::make_shared<AudioContentDescription>();
-    auto video_content = std::make_shared<VideoContentDescription>();
-    //保存a=ice-ufrag  ice-pwd信息
-    auto audio_td = std::make_shared<TransportDescription>();
-    auto video_td = std::make_shared<TransportDescription>();
-
-    for (auto field : fields) {
-        // 如果以\r\n换行，去掉尾部的\r
-        if (is_rn) {
-            field = field.substr(0, field.length() - 1);
-        }
-
-
-        if (field.find("a=group:BUNDLE") != std::string::npos) {
-            std::vector<std::string> items;
-            /*例如，如果field是"a=group:BUNDLE audio video"，那么items将包含{"a=group:BUNDLE", "audio", "video"}。*/
-            rtc::tokenize(field, ' ', &items);//使用rtc::tokenize函数将field字符串按照空格分割成多个子字符串，并存储到items向量中。
-            if (items.size() > 1) {
-                /*创建一个ContentGroup对象offer_bundle，并将其类型设置为"BUNDLE"。
-ContentGroup类通常用于表示SDP中的组信息，比如BUNDLE组。*/
-                ContentGroup offer_bundle("BUNDLE");
-                for (size_t i = 1; i < items.size(); ++i) {
-                    //遍历分割后的items向量，从索引1开始（跳过第一个元素"a=group:BUNDLE"）。
-                    offer_bundle.AddContentName(items[i]);
-                }
-                //将BUNDLE组添加到远程描述
-                remote_desc_->AddGroup(offer_bundle);
+    static bool ParseTransportInfo(TransportDescription *td,
+                                   const std::string &line)
+    {
+        if (line.find("a=ice-ufrag") != std::string::npos)
+        {
+            td->ice_ufrag = GetAttribute(line);
+            if (td->ice_ufrag.empty())
+            {
+                return false;
             }
         }
-            else if (field.find_first_of("m=") == 0) {
+        else if (line.find("a=ice-pwd") != std::string::npos)
+        {
+            td->ice_pwd = GetAttribute(line);
+            if (td->ice_pwd.empty())
+            {
+                return false;
+            }
+        }
+
+        return true;
+    }
+
+    int PeerConnection::SetRemoteSDP(const std::string &sdp)
+    {
+        std::vector<std::string> fields;
+        // SDP用\n, \r\n来换行的
+        rtc::tokenize(sdp, '\n', &fields);
+        if (fields.size() <= 0)
+        {
+            RTC_LOG(LS_WARNING) << "invalid sdp: " << sdp;
+            return -1;
+        }
+
+        // 判断是否是\r\n换行
+        bool is_rn = false;
+        if (sdp.find("\r\n") != std::string::npos)
+        {
+            is_rn = true;
+        }
+
+        remote_desc_ = std::make_unique<SessionDescription>(SdpType::kOffer);
+
+        std::string mid;
+        // 保存M行的信息
+        auto audio_content = std::make_shared<AudioContentDescription>();
+        auto video_content = std::make_shared<VideoContentDescription>();
+        // 保存a=ice-ufrag  ice-pwd信息
+        auto audio_td = std::make_shared<TransportDescription>();
+        auto video_td = std::make_shared<TransportDescription>();
+
+        for (auto field : fields)
+        {
+            // 如果以\r\n换行，去掉尾部的\r
+            if (is_rn)
+            {
+                field = field.substr(0, field.length() - 1);
+            }
+
+            if (field.find("a=group:BUNDLE") != std::string::npos)
+            {
+                std::vector<std::string> items;
+                /*例如，如果field是"a=group:BUNDLE audio video"，那么items将包含{"a=group:BUNDLE", "audio", "video"}。*/
+                rtc::tokenize(field, ' ', &items); // 使用rtc::tokenize函数将field字符串按照空格分割成多个子字符串，并存储到items向量中。
+                if (items.size() > 1)
+                {
+                    /*创建一个ContentGroup对象offer_bundle，并将其类型设置为"BUNDLE"。
+    ContentGroup类通常用于表示SDP中的组信息，比如BUNDLE组。*/
+                    ContentGroup offer_bundle("BUNDLE");
+                    for (size_t i = 1; i < items.size(); ++i)
+                    {
+                        // 遍历分割后的items向量，从索引1开始（跳过第一个元素"a=group:BUNDLE"）。
+                        offer_bundle.AddContentName(items[i]);
+                    }
+                    // 将BUNDLE组添加到远程描述
+                    remote_desc_->AddGroup(offer_bundle);
+                }
+            }
+            else if (field.find_first_of("m=") == 0)
+            {
                 std::vector<std::string> items;
                 rtc::tokenize(field, ' ', &items);
-                if (items.size() <= 2) {
+                if (items.size() <= 2)
+                {
                     RTC_LOG(LS_WARNING) << "parse m= failed: " << field;
                     return -1;
                 }
 
-                 //m=audio/video
+                // m=audio/video
                 mid = items[0].substr(2);
-                if (mid == "audio") {
+                if (mid == "audio")
+                {
                     remote_desc_->AddContent(audio_content);
                     audio_td->mid = mid;
                 }
-                else if (mid == "video") {
+                else if (mid == "video")
+                {
                     remote_desc_->AddContent(video_content);
                     video_td->mid = mid;
                 }
             }
-            
-            if ("audio" == mid) {
-                if (!ParseCandidates(audio_content.get(), field)) {
+
+            if ("audio" == mid)
+            {
+                if (!ParseCandidates(audio_content.get(), field))
+                {
                     RTC_LOG(LS_WARNING) << "parse candidate failed: " << field;
                     return -1;
                 }
 
-                if (!ParseTransportInfo(audio_td.get(), field)) {
+                if (!ParseTransportInfo(audio_td.get(), field))
+                {
                     RTC_LOG(LS_WARNING) << "parse transport info failed: " << field;
                     return -1;
                 }
             }
-            else if ("video" == mid) {
-                if (!ParseCandidates(video_content.get(), field)) {
+            else if ("video" == mid)
+            {
+                if (!ParseCandidates(video_content.get(), field))
+                {
                     RTC_LOG(LS_WARNING) << "parse candidate failed: " << field;
                     return -1;
                 }
 
-                if (!ParseTransportInfo(video_td.get(), field)) {
+                if (!ParseTransportInfo(video_td.get(), field))
+                {
                     RTC_LOG(LS_WARNING) << "parse transport info failed: " << field;
                     return -1;
                 }
@@ -181,74 +206,84 @@ ContentGroup类通常用于表示SDP中的组信息，比如BUNDLE组。*/
         remote_desc_->AddTransportInfo(audio_td);
         remote_desc_->AddTransportInfo(video_td);
 
-        if (video_content) {
+        if (video_content)
+        {
             auto video_codecs = video_content->codecs();
-            if (!video_codecs.empty()) {
+            if (!video_codecs.empty())
+            {
                 video_pt_ = video_codecs[0]->id;
             }
 
-            if (video_codecs.size() > 1) {
+            if (video_codecs.size() > 1)
+            {
                 video_rtx_pt_ = video_codecs[1]->id;
             }
         }
 
-        transport_controller_->SetRemoteSDP(remote_desc_.get());//将解析的sdp设置到transport_controller
+        transport_controller_->SetRemoteSDP(remote_desc_.get()); // 将解析的sdp设置到transport_controller
 
         return 0;
     }
 
-    static RtpDirection GetDirection(bool send, bool recv) {
-        if (send && recv) {
+    static RtpDirection GetDirection(bool send, bool recv)
+    {
+        if (send && recv)
+        {
             return RtpDirection::kSendRecv;
         }
-        else if (send && !recv) {
+        else if (send && !recv)
+        {
             return RtpDirection::kSendOnly;
         }
-        else if (!send && recv) {
+        else if (!send && recv)
+        {
             return RtpDirection::kRecvOnly;
         }
-        else {
+        else
+        {
             return RtpDirection::kInactive;
         }
     }
 
-    std::string PeerConnection::CreateAnswer(const RTCOfferAnswerOptions& options, const std::string& stream_id)
+    std::string PeerConnection::CreateAnswer(const RTCOfferAnswerOptions &options, const std::string &stream_id)
     {
         local_desc_ = std::make_unique<SessionDescription>(SdpType::kAnswer);
 
         ice::IceParameters ice_param = ice::IceCredentials::CreateRandomIceCredentials();
         std::string cname = rtc::CreateRandomString(16);
 
-        if (options.send_audio || options.recv_audio) {
+        if (options.send_audio || options.recv_audio)
+        {
             auto audio_content = std::make_shared<AudioContentDescription>();
             audio_content->set_direction(GetDirection(options.send_audio, options.recv_audio));
             audio_content->set_rtcp_mux(options.use_rtcp_mux);
             local_desc_->AddContent(audio_content);
-            local_desc_->AddTransportInfo(audio_content->mid(),ice_param);
-            
-            // 如果发送音频，需要创建stream
-              if (options.send_audio) {
-                  StreamParams audio_stream;
-                  audio_stream.id = rtc::CreateRandomString(16);
-                  audio_stream.stream_id = stream_id;
-                  audio_stream.cname = cname;
-                  local_audio_ssrc_ = rtc::CreateRandomId();
-                  audio_stream.ssrcs.push_back(local_audio_ssrc_);
-                  audio_content->AddStream(audio_stream);
+            local_desc_->AddTransportInfo(audio_content->mid(), ice_param);
 
-        
-              }
+            // 如果发送音频，需要创建stream
+            if (options.send_audio)
+            {
+                StreamParams audio_stream;
+                audio_stream.id = rtc::CreateRandomString(16);
+                audio_stream.stream_id = stream_id;
+                audio_stream.cname = cname;
+                local_audio_ssrc_ = rtc::CreateRandomId();
+                audio_stream.ssrcs.push_back(local_audio_ssrc_);
+                audio_content->AddStream(audio_stream);
+            }
         }
 
-        if (options.send_video || options.recv_video) {
+        if (options.send_video || options.recv_video)
+        {
             auto video_content = std::make_shared<VideoContentDescription>();
             video_content->set_direction(GetDirection(options.send_video, options.recv_video));
             video_content->set_rtcp_mux(options.use_rtcp_mux);
             local_desc_->AddContent(video_content);
             local_desc_->AddTransportInfo(video_content->mid(), ice_param);
-         
+
             // 如果发送视频，需要创建stream
-            if (options.send_video) {
+            if (options.send_video)
+            {
                 std::string id = rtc::CreateRandomString(16);
                 StreamParams video_stream;
                 video_stream.id = id;
@@ -258,7 +293,6 @@ ContentGroup类通常用于表示SDP中的组信息，比如BUNDLE组。*/
                 local_video_rtx_ssrc_ = rtc::CreateRandomId();
                 video_stream.ssrcs.push_back(local_video_ssrc_);
                 video_stream.ssrcs.push_back(local_video_rtx_ssrc_);
-                
 
                 // 分组
                 SsrcGroup sg;
@@ -277,71 +311,89 @@ ContentGroup类通常用于表示SDP中的组信息，比如BUNDLE组。*/
                 video_rtx_stream.ssrcs.push_back(local_video_rtx_ssrc_);
                 video_content->AddStream(video_rtx_stream);
             }
-        
         }
 
-
         // 创建BUNDLE
-        if (options.use_rtp_mux) {
+        if (options.use_rtp_mux)
+        {
             ContentGroup answer_bundle("BUNDLE");
-            for (auto content : local_desc_->contents()) {
+            for (auto content : local_desc_->contents())
+            {
                 answer_bundle.AddContentName(content->mid());
             }
 
-            if (!answer_bundle.content_names().empty()) {
+            if (!answer_bundle.content_names().empty())
+            {
                 local_desc_->AddGroup(answer_bundle);
             }
         }
 
-        transport_controller_->SetLocalSDP(local_desc_.get());//设置本地SDP
-        return local_desc_->ToString();//文本转换为SDP格式
+        transport_controller_->SetLocalSDP(local_desc_.get()); // 设置本地SDP
+        return local_desc_->ToString();                        // 文本转换为SDP格式
     }
 
     bool PeerConnection::SendEncodeImage(std::shared_ptr<MediaFrame> frame)
     {
-        if (pc_state_ != PeerConnectionState::kConnected) {
-            return true;
-        }
+        // 添加更多日志，跟踪RTP包创建过程
+        RTC_LOG(LS_INFO) << "SendEncodeImage: 开始打包视频帧，大小=" << frame->data_len[0];
 
-        // 视频的频率90000, 1s中90000份 1ms => 90
         uint32_t rtp_timestamp = frame->ts * 90;
-
-        /*if (video_send_stream_) {
-            video_send_stream_->OnSendingRtpFrame(rtp_timestamp,
-                frame->capture_time_ms,
-                frame->fmt.sub_fmt.video_fmt.idr);
-        }*/
 
         RtpPacketizer::Config config;
         auto packetizer = RtpPacketizer::Create(webrtc::kVideoCodecH264,
-            rtc::ArrayView<const uint8_t>((uint8_t*)frame->data[0], frame->data_len[0]),
-            config);
+                                                rtc::ArrayView<const uint8_t>((uint8_t *)frame->data[0], frame->data_len[0]),
+                                                config);
 
-        while (true) {
+        int packet_count = 0;
+        int success_count = 0;
+        while (true)
+        {
             auto single_packet = std::make_shared<RtpPacketToSend>();
             single_packet->SetPayloadType(video_pt_);
             single_packet->SetTimestamp(rtp_timestamp);
             single_packet->SetSsrc(local_video_ssrc_);
 
-            if (!packetizer->NextPacket(single_packet.get())) {
-                break;
+            if (!packetizer->NextPacket(single_packet.get()))
+            {
+                break; // 打包完成或出错
             }
+
+            // --- 添加日志 ---
+            RTC_LOG(LS_INFO) << "Packetizer::NextPacket 成功，负载大小="
+                             << single_packet->payload_size() << ", 总大小="
+                             << single_packet->size();
+            // --- 结束日志添加 ---
 
             single_packet->SetSequenceNumber(video_seq_++);
 
-            // 发送数据包
-            // TODO, transport_name此处写死，后面可以换成变量
-            transport_controller_->SendPacket("audio", (const char*)single_packet->data(),
-                single_packet->size());
+            RTC_LOG(LS_INFO) << "发送RTP包：序号=" << video_seq_ - 1
+                             << "，大小=" << single_packet->size();
+
+            // 使用"audio"而不是"video"作为传输通道名称，因为在BUNDLE模式下，所有媒体通过第一个通道发送
+            int result = transport_controller_->SendPacket("audio", (const char *)single_packet->data(),
+                                                           single_packet->size());
+
+            // --- 重要：确保是这样判断 ---
+            bool success = (result > 0); // 大于0才算成功
+            RTC_LOG(LS_INFO) << "RTP包发送结果: " << (success ? "成功" : "失败")
+                             << ", 返回值=" << result;
+            // --- 结束重要修改 ---
+
+            packet_count++;
+            if (success)
+                success_count++;
         }
 
+        RTC_LOG(LS_INFO) << "视频帧分包完成，共 " << packet_count
+                         << " 个RTP包, 成功发送 " << success_count << " 个"; // 更新日志以显示成功发送的数量
         return true;
     }
 
-    void PeerConnection::OnIceState(TransportController*, ice::IceTransportState ice_state)
+    void PeerConnection::OnIceState(TransportController *, ice::IceTransportState ice_state)
     {
         PeerConnectionState pc_state = PeerConnectionState::kNew;
-        switch (ice_state) {
+        switch (ice_state)
+        {
         case ice::IceTransportState::kNew:
             pc_state = PeerConnectionState::kNew;
             break;
@@ -351,6 +403,7 @@ ContentGroup类通常用于表示SDP中的组信息，比如BUNDLE组。*/
         case ice::IceTransportState::kConnected:
         case ice::IceTransportState::kCompleted:
             pc_state = PeerConnectionState::kConnected;
+            RTC_LOG(LS_INFO) << "ICE连接已建立，可以发送媒体数据";
             break;
         case ice::IceTransportState::kDisconnected:
             pc_state = PeerConnectionState::kDisconnected;
@@ -365,9 +418,9 @@ ContentGroup类通常用于表示SDP中的组信息，比如BUNDLE组。*/
             break;
         }
 
-        if (pc_state != pc_state_) {
-            RTC_LOG(LS_INFO) << "peerconnection state change, from " << pc_state_
-                << "=>" << pc_state;
+        if (pc_state != pc_state_)
+        {
+            RTC_LOG(LS_INFO) << "PeerConnection状态发生变化: " << (int)pc_state_ << " => " << (int)pc_state;
             pc_state_ = pc_state;
             SignalConnectionState(this, pc_state);
         }

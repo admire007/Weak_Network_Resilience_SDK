@@ -1,103 +1,126 @@
 ﻿#include "xrtc/rtc/pc/transport_controller.h"
 
+#include <rtc_base/logging.h>
 #include "xrtc/base/xrtc_global.h"
 #include "xrtc/rtc/pc/session_description.h"
 
-namespace xrtc {
-
-TransportController::TransportController() :
-    ice_agent_(new ice::IceAgent(XRTCGlobal::Instance()->network_thread(),
-        XRTCGlobal::Instance()->port_allocator()))
+namespace xrtc
 {
-    ice_agent_->SignalIceState.connect(this,
-        &TransportController::OnIceState);
-    ice_agent_->SignalReadPacket.connect(this,
-        &TransportController::OnReadPacket);
- 
-}
 
-TransportController::~TransportController() {
-    if (ice_agent_) {
-        ice_agent_->Destroy();
-        ice_agent_ = nullptr;
-    }
-}
-
-int TransportController::SetRemoteSDP(SessionDescription* desc) {
-    if (!desc) {//检查传入的 SessionDescription 指针是否有效
-        return -1;
+    TransportController::TransportController() : ice_agent_(new ice::IceAgent(XRTCGlobal::Instance()->network_thread(),
+                                                                              XRTCGlobal::Instance()->port_allocator()))
+    {
+        ice_agent_->SignalIceState.connect(this,
+                                           &TransportController::OnIceState);
+        ice_agent_->SignalReadPacket.connect(this,
+                                             &TransportController::OnReadPacket);
     }
 
-    /*遍历 SDP 中的所有媒体内容（通常是音频和视频）。
-    如果启用了 BUNDLE 功能（允许多个媒体流共用一个传输通道），
-    则只处理第一个 BUNDLE 媒体，跳过其他媒体，因为它们会共享同一个传输通道。*/
-    for (auto content : desc->contents()) {
-        std::string mid = content->mid();
-        //开启了bundle功能，audio和video是复用一个通道的
-        //只需要第一个bundle去创建即可
-        if (desc->IsBundle(mid) && mid != desc->GetFirstBundleId()) {
-            continue;
-        }
-
-        // 创建ICE transport
-        // RTCP, 默认开启a=rtcp:mux
-        /*为每个需要的媒体创建 ICE 传输通道。参数 1 表示这是 RTP 通道（而不是 RTCP 通道）。
-        由于启用了 RTCP 多路复用（rtcp-mux），所以只需要创建 RTP 通道，RTCP 数据会通过同一个通道传输。*/
-        ice_agent_->CreateIceTransport(mid, 1); // 1: RTP
-
-        // 设置ICE param
-        /*从 SDP 中获取并设置远端的 ICE 参数（用户名片段和密码）。这些参数用于 ICE 连接过程中的身份验证。*/
-        auto td = desc->GetTransportInfo(mid);
-        if (td) {
-            ice_agent_->SetRemoteIceParams(mid, 1, ice::IceParameters(
-                td->ice_ufrag, td->ice_pwd));
-        }
-
-        // 设置ICE candidate
-        /*将远端提供的所有 ICE 候选者添加到对应的传输通道中，这些候选者代表了可能的连接端点。*/
-        for (auto candidate : content->candidates()) {
-            ice_agent_->AddRemoteCandidate(mid, 1, candidate);
+    TransportController::~TransportController()
+    {
+        if (ice_agent_)
+        {
+            ice_agent_->Destroy();
+            ice_agent_ = nullptr;
         }
     }
 
-    return 0;
-}
-
-int TransportController::SetLocalSDP(SessionDescription* desc)
-{
-    if (!desc) {
-        return -1;
-    }
-
-    for (auto content : desc->contents()) {
-        std::string mid = content->mid();
-        if (desc->IsBundle(mid) && mid != desc->GetFirstBundleId()) {
-            continue;
+    int TransportController::SetRemoteSDP(SessionDescription *desc)
+    {
+        if (!desc)
+        { // 检查传入的 SessionDescription 指针是否有效
+            return -1;
         }
 
-        auto td = desc->GetTransportInfo(mid);
-        if (td) {
-            ice_agent_->SetIceParams(mid, 1, ice::IceParameters(td->ice_ufrag,td->ice_pwd));
+        /*遍历 SDP 中的所有媒体内容（通常是音频和视频）。
+        如果启用了 BUNDLE 功能（允许多个媒体流共用一个传输通道），
+        则只处理第一个 BUNDLE 媒体，跳过其他媒体，因为它们会共享同一个传输通道。*/
+        for (auto content : desc->contents())
+        {
+            std::string mid = content->mid();
+            // 开启了bundle功能，audio和video是复用一个通道的
+            // 只需要第一个bundle去创建即可
+            if (desc->IsBundle(mid) && mid != desc->GetFirstBundleId())
+            {
+                continue;
+            }
+
+            // 创建ICE transport
+            // RTCP, 默认开启a=rtcp:mux
+            /*为每个需要的媒体创建 ICE 传输通道。参数 1 表示这是 RTP 通道（而不是 RTCP 通道）。
+            由于启用了 RTCP 多路复用（rtcp-mux），所以只需要创建 RTP 通道，RTCP 数据会通过同一个通道传输。*/
+            ice_agent_->CreateIceTransport(mid, 1); // 1: RTP
+
+            // 设置ICE param
+            /*从 SDP 中获取并设置远端的 ICE 参数（用户名片段和密码）。这些参数用于 ICE 连接过程中的身份验证。*/
+            auto td = desc->GetTransportInfo(mid);
+            if (td)
+            {
+                ice_agent_->SetRemoteIceParams(mid, 1, ice::IceParameters(td->ice_ufrag, td->ice_pwd));
+            }
+
+            // 设置ICE candidate
+            /*将远端提供的所有 ICE 候选者添加到对应的传输通道中，这些候选者代表了可能的连接端点。*/
+            for (auto candidate : content->candidates())
+            {
+                ice_agent_->AddRemoteCandidate(mid, 1, candidate);
+            }
         }
 
+        return 0;
     }
-    ice_agent_->GatheringCandidate();
-    return 0;
-}
 
-int TransportController::SendPacket(const std::string& transport_name, const char* data, size_t len)
-{
-    return ice_agent_->SendPacket(transport_name, 1, data, len);
-}
+    int TransportController::SetLocalSDP(SessionDescription *desc)
+    {
+        if (!desc)
+        {
+            return -1;
+        }
 
-void TransportController::OnIceState(ice::IceAgent*, ice::IceTransportState icee_state)
-{
-}
+        for (auto content : desc->contents())
+        {
+            std::string mid = content->mid();
+            if (desc->IsBundle(mid) && mid != desc->GetFirstBundleId())
+            {
+                continue;
+            }
 
-void TransportController::OnReadPacket(ice::IceAgent*, const std::string&, int, const char* data, size_t len, int64_t ts)
-{
-}
+            auto td = desc->GetTransportInfo(mid);
+            if (td)
+            {
+                ice_agent_->SetIceParams(mid, 1, ice::IceParameters(td->ice_ufrag, td->ice_pwd));
+            }
+        }
+        ice_agent_->GatheringCandidate();
+        return 0;
+    }
 
+    int TransportController::SendPacket(const std::string &transport_name, const char *data, size_t len)
+    {
+        RTC_LOG(LS_INFO) << "TransportController::SendPacket called: transport_name=" << transport_name
+                         << ", data_len=" << len;
 
+        // 检查transport_name是否有效
+        if (transport_name != "audio" && transport_name != "video")
+        {
+            RTC_LOG(LS_WARNING) << "Invalid transport name: " << transport_name << ", should be 'audio' or 'video'";
+        }
+
+        int result = ice_agent_->SendPacket(transport_name, 1, data, len);
+        RTC_LOG(LS_INFO) << "ice_agent_->SendPacket result=" << result;
+        return result;
+    }
+
+    void TransportController::OnIceState(ice::IceAgent *, ice::IceTransportState ice_state)
+    {
+        RTC_LOG(LS_INFO) << "ICE state changed: " << (int)ice_state;
+
+        // 触发信号通知PeerConnection
+        SignalIceState(this, ice_state);
+    }
+
+    void TransportController::OnReadPacket(ice::IceAgent *, const std::string &, int, const char *data, size_t len, int64_t ts)
+    {
+    }
 
 } // namespace xrtc
