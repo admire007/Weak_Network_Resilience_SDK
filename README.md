@@ -12,4 +12,10 @@
 - RTP/RTCP 协议 ：实现了 RTP 打包和 RTCP 反馈机制
   
 - 视频推流 : 推流接口封装及视频编码帧发送
-  
+
+
+##  足迹
+4.21：
+解决了无法将RTP包推送到网络的问题，在实现中找到了空包负荷导致的发送包一直为rtp活跃包，增加打印+wireshark抓包查看发送包的情况，以及解决其他大大小小的报错
+### 成果展示
+ ![推流成功](https://github.com/admire007/Weak_Network_Resilience_SDK/blob/main/%E6%8E%A8%E6%B5%81%E6%88%90%E5%8A%9F.gif)
